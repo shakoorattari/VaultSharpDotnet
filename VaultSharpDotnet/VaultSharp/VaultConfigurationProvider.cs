@@ -38,7 +38,7 @@ namespace VaultSharpDotnet.VaultSharp
         {
             try
             {
-                var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync("database", null, "secret");
+                var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync("invoice", null, "secret");
                 if (kv2Secret.Data.Data.Any())
                 {
                     foreach (var data in kv2Secret.Data.Data)
