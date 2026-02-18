@@ -18,11 +18,14 @@ namespace VaultSharpDotnet
                 {
 
                     config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                    // load environment-specific settings so "Vault:Secret" from appsettings.Development.json is available here
+                    config.AddJsonFile($"appsettings.{hostingContext.HostingEnvironment.EnvironmentName}.json", optional: true, reloadOnChange: true);
                     config.AddEnvironmentVariables(prefix: "VAULT_");
 
                     var builtConfig = config.Build();
 
-                    if (builtConfig.GetSection("Vault")["Role"] != null)
+                    // Only add the Vault provider when a Vault token is configured (avoids startup failure when token is absent)
+                    if (!string.IsNullOrWhiteSpace(builtConfig["Vault:Secret"]))
                     {
                         config.AddVault(options =>
                         {

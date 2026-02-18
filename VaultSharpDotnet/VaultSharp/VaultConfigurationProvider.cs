@@ -38,19 +38,30 @@ namespace VaultSharpDotnet.VaultSharp
         {
             try
             {
-                var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync("invoice", null, "secret");
-                if (kv2Secret.Data.Data.Any())
+                // allow mount path override via configuration (defaults to "secret")
+                var mount = string.IsNullOrWhiteSpace(_config.MountPath) ? "secret" : _config.MountPath;
+
+                var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync("invoice", null, mount);
+
+                if (kv2Secret?.Data?.Data != null && kv2Secret.Data.Data.Any())
                 {
-                    foreach (var data in kv2Secret.Data.Data)
+                    foreach (var kv in kv2Secret.Data.Data)
                     {
-                        Data.Add(data.Key, data.Value.ToString());
+                        // overwrite or add the value into configuration data
+                        Data[kv.Key] = kv.Value?.ToString();
                     }
-                }    
+                }
+                else
+                {
+                    // No secret found at the expected path — log and continue so app can start.
+                    Console.WriteLine($"[VaultConfigurationProvider] no data found at '{mount}/invoice' — continuing without Vault secrets.");
+                }
             }
             catch (Exception ex)
             {
-
-                throw new Exception(ex.Message);
+                // Don't fail application startup for Vault read errors in development/demo scenarios.
+                // In production you should surface or handle this according to your availability requirements.
+                Console.WriteLine($"[VaultConfigurationProvider] failed to read secrets from Vault: {ex.Message}");
             }
         }
     }

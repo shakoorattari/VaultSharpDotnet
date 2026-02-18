@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using VaultSharpDotnet.Models;
 
 namespace VaultSharpDotnet
 {
@@ -27,6 +28,15 @@ namespace VaultSharpDotnet
         {
 
             services.AddControllers();
+
+            // Bind secrets loaded into IConfiguration by the Vault provider to a strongly-typed options class.
+            // This is the recommended pattern for consuming secrets in DI-friendly, testable code.
+            services.Configure<InvoiceCredentials>(opts =>
+            {
+                opts.Username = Configuration["username"];
+                opts.Password = Configuration["password"];
+            });
+
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "VaultSharpDotnet", Version = "v1" });

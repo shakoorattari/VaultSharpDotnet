@@ -106,7 +106,7 @@ sequenceDiagram
 2. **Start Vault server**
 
    ```bash
-   docker run -d --name hashicorp_vault \
+   docker run -d --name valut \
      --cap-add=IPC_LOCK \
      -e 'VAULT_DEV_ROOT_TOKEN_ID=myroot' \
      -e 'VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200' \
@@ -116,11 +116,18 @@ sequenceDiagram
 3. **Configure secrets**
 
    ```bash
-   # Create invoice secret
+   # Create invoice secret (Linux / macOS / WSL)
    curl -H "X-Vault-Token: myroot" \
         -X POST \
         -d '{"data":{"username":"invoice_user","password":"secure123"}}' \
         http://localhost:8200/v1/secret/data/invoice
+   ```
+
+   ```powershell
+   # Create invoice secret (Windows PowerShell)
+   Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8200/v1/secret/data/invoice \
+     -Headers @{ 'X-Vault-Token' = 'myroot' } \
+     -Body (@{ data = @{ username = 'invoice_user'; password = 'secure123' } } | ConvertTo-Json)
    ```
 
 4. **Run the application**
@@ -132,8 +139,21 @@ sequenceDiagram
    ```
 
 5. **Access the API**
-   - Swagger UI: <http://localhost:5000/swagger>
-   - Weather API: <http://localhost:5000/WeatherForecast>
+   - Swagger UI: <http://localhost:5005/swagger>
+   - Weather API: <http://localhost:5005/WeatherForecast>
+   - Invoice API (demo):
+     - GET `http://localhost:5005/api/invoice/credentials` — returns `username` and `password` (development/demo only)
+     - GET `http://localhost:5005/api/invoice/credentials/redacted` — returns `username` and masked password
+
+   Example: call the invoice endpoint (Windows PowerShell)
+   ```powershell
+   Invoke-RestMethod -Uri http://localhost:5005/api/invoice/credentials -UseBasicParsing
+   ```
+
+   Example: call the invoice endpoint (curl)
+   ```bash
+   curl http://localhost:5005/api/invoice/credentials
+   ```
 
 ## Vault Setup
 
