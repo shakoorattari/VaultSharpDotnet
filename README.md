@@ -144,15 +144,37 @@ sequenceDiagram
    - Invoice API (demo):
      - GET `http://localhost:5005/api/invoice/credentials` — returns `username` and `password` (development/demo only)
      - GET `http://localhost:5005/api/invoice/credentials/redacted` — returns `username` and masked password
+   - Products API (sample CRUD) — uses DB credentials retrieved from Vault (or falls back to local SQLite for development):
+     - GET  `http://localhost:5005/api/products`
+     - GET  `http://localhost:5005/api/products/{id}`
+     - POST `http://localhost:5005/api/products` (body: Product JSON)
+     - PUT  `http://localhost:5005/api/products/{id}` (body: Product JSON)
+     - DELETE `http://localhost:5005/api/products/{id}`
+
+   Notes:
+   - If `db:connectionString` is present in Vault the app will use that SQL Server connection.
+   - Otherwise the app now uses a local SQLite DB file (`products.db`) for persistent development data.
 
    Example: call the invoice endpoint (Windows PowerShell)
+
    ```powershell
    Invoke-RestMethod -Uri http://localhost:5005/api/invoice/credentials -UseBasicParsing
    ```
 
    Example: call the invoice endpoint (curl)
+
    ```bash
    curl http://localhost:5005/api/invoice/credentials
+   ```
+
+   Example: call the products endpoint (curl)
+
+   ```bash
+   # list products
+   curl http://localhost:5005/api/products
+
+   # create product
+   curl -H "Content-Type: application/json" -X POST -d '{"name":"Sample","description":"Demo","price":9.99}' http://localhost:5005/api/products
    ```
 
 ## Vault Setup

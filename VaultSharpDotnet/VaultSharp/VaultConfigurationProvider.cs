@@ -31,37 +31,38 @@ namespace VaultSharpDotnet.VaultSharp
 
         public async Task LoadAsync()
         {
-            await GetDatabaseCredentials();
+            // read one or more secret paths and merge values into configuration
+            await ReadAndMergeSecret("invoice");
+            await ReadAndMergeSecret("database");
         }
 
-        public async Task GetDatabaseCredentials()
+        private async Task ReadAndMergeSecret(string secretName)
         {
             try
             {
-                // allow mount path override via configuration (defaults to "secret")
                 var mount = string.IsNullOrWhiteSpace(_config.MountPath) ? "secret" : _config.MountPath;
-
-                var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync("invoice", null, mount);
+                var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync(secretName, null, mount);
 
                 if (kv2Secret?.Data?.Data != null && kv2Secret.Data.Data.Any())
                 {
                     foreach (var kv in kv2Secret.Data.Data)
                     {
-                        // overwrite or add the value into configuration data
-                        Data[kv.Key] = kv.Value?.ToString();
+                        // prefix database keys to avoid collisions (e.g. db:username)
+                        var key = secretName.Equals("database", StringComparison.OrdinalIgnoreCase)
+                            ? $"db:{kv.Key}"
+                            : kv.Key;
+
+                        Data[key] = kv.Value?.ToString();
                     }
                 }
                 else
                 {
-                    // No secret found at the expected path — log and continue so app can start.
-                    Console.WriteLine($"[VaultConfigurationProvider] no data found at '{mount}/invoice' — continuing without Vault secrets.");
+                    Console.WriteLine($"[VaultConfigurationProvider] no data found at '{mount}/{secretName}' — continuing without those secrets.");
                 }
             }
             catch (Exception ex)
             {
-                // Don't fail application startup for Vault read errors in development/demo scenarios.
-                // In production you should surface or handle this according to your availability requirements.
-                Console.WriteLine($"[VaultConfigurationProvider] failed to read secrets from Vault: {ex.Message}");
+                Console.WriteLine($"[VaultConfigurationProvider] failed to read '{secretName}' from Vault: {ex.Message}");
             }
         }
     }
