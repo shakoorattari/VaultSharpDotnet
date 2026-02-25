@@ -1,8 +1,11 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using VaultSharp;
+using VaultSharp.V1.AuthMethods;
+using VaultSharp.V1.AuthMethods.AppRole;
 using VaultSharp.V1.AuthMethods.Token;
 
 namespace VaultSharpDotnet.VaultSharp
@@ -16,11 +19,36 @@ namespace VaultSharpDotnet.VaultSharp
         {
             _config = config;
 
-            var vaultClientSettings = new VaultClientSettings(
-                _config.Address,
-                new TokenAuthMethodInfo(_config.Secret)
-            );
+            IAuthMethodInfo authMethod;
 
+            if (string.Equals(_config.SecretType, "AppRole", StringComparison.OrdinalIgnoreCase))
+            {
+                // MountPath is the approle auth mount (default: "approle")
+                var authMount = string.IsNullOrWhiteSpace(_config.MountPath)
+                    ? "approle"
+                    : _config.MountPath.Trim('/');
+
+                authMethod = new AppRoleAuthMethodInfo(authMount, _config.Role, _config.Secret);
+            }
+            else
+            {
+                authMethod = new TokenAuthMethodInfo(_config.Secret);
+            }
+
+            var vaultClientSettings = new VaultClientSettings(_config.Address, authMethod)
+            {
+                // Allow self-signed / internal-CA certificates (common in enterprise Vault deployments).
+                // Also enables cookie persistence for load-balancer session affinity.
+                PostProcessHttpClientHandlerAction = handler =>
+                {
+                    if (handler is HttpClientHandler h)
+                    {
+                        h.UseCookies = true;
+                        h.ServerCertificateCustomValidationCallback =
+                            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                    }
+                }
+            };
             _client = new VaultClient(vaultClientSettings);
         }
 
@@ -31,29 +59,26 @@ namespace VaultSharpDotnet.VaultSharp
 
         public async Task LoadAsync()
         {
-            // read one or more secret paths and merge values into configuration
-            await ReadAndMergeSecret("invoice");
-            await ReadAndMergeSecret("database");
+            var secretMount = string.IsNullOrWhiteSpace(_config.SecretMount) ? "secret" : _config.SecretMount;
+            var secretPath  = string.IsNullOrWhiteSpace(_config.SecretPath)  ? "dev"    : _config.SecretPath;
+
+            await ReadAndMergeSecret(secretPath, secretMount);
         }
 
-        private async Task ReadAndMergeSecret(string secretName)
+        private async Task ReadAndMergeSecret(string secretName, string mount)
         {
             try
             {
-                var mount = string.IsNullOrWhiteSpace(_config.MountPath) ? "secret" : _config.MountPath;
                 var kv2Secret = await _client.V1.Secrets.KeyValue.V2.ReadSecretAsync(secretName, null, mount);
 
                 if (kv2Secret?.Data?.Data != null && kv2Secret.Data.Data.Any())
                 {
                     foreach (var kv in kv2Secret.Data.Data)
                     {
-                        // prefix database keys to avoid collisions (e.g. db:username)
-                        var key = secretName.Equals("database", StringComparison.OrdinalIgnoreCase)
-                            ? $"db:{kv.Key}"
-                            : kv.Key;
-
-                        Data[key] = kv.Value?.ToString();
+                        Data[kv.Key] = kv.Value?.ToString();
                     }
+
+                    Console.WriteLine($"[VaultConfigurationProvider] loaded {kv2Secret.Data.Data.Count} key(s) from '{mount}/{secretName}'.");
                 }
                 else
                 {
@@ -62,7 +87,7 @@ namespace VaultSharpDotnet.VaultSharp
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[VaultConfigurationProvider] failed to read '{secretName}' from Vault: {ex.Message}");
+                Console.WriteLine($"[VaultConfigurationProvider] failed to read '{mount}/{secretName}' from Vault: {ex.Message}");
             }
         }
     }

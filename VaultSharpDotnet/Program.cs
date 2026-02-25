@@ -35,6 +35,8 @@ namespace VaultSharpDotnet
                             options.MountPath = vaultOptions["MountPath"];
                             options.SecretType = vaultOptions["SecretType"];
                             options.Secret = vaultOptions["Secret"];
+                            options.SecretMount = vaultOptions["SecretMount"];
+                            options.SecretPath = vaultOptions["SecretPath"];
                         });
                     }
                 })
